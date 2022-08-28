@@ -21,12 +21,7 @@
 
 #include "lipkg.h"
 
-#include <math.h>
-#include <string.h>
-
-#include <algorithm>
-
-#include "tofbf.h"
+namespace ldlidar {
 
 static const uint8_t CrcTable[256] = {
     0x00, 0x4d, 0x9a, 0xd7, 0x79, 0x34, 0xe3, 0xae, 0xf2, 0xbf, 0x68, 0x25,
@@ -61,21 +56,22 @@ uint8_t CalCRC8(const uint8_t *data, uint16_t data_len) {
   return crc;
 }
 
-LiPkg::LiPkg(std::string frame_id, bool laser_scan_dir, bool enable_angle_crop_func,
-  double angle_crop_min, double angle_crop_max)
-    : timestamp_(0),
+LiPkg::LiPkg()
+    : sdk_pack_version_("v2.3.4"),
+      timestamp_(0),
       speed_(0),
       error_times_(0),
-      is_frame_ready_(false),
-      is_pkg_ready_(false),
-      laser_scan_dir_(laser_scan_dir),
-      enable_angle_crop_func_(enable_angle_crop_func),
-      angle_crop_min_(angle_crop_min),
-      angle_crop_max_(angle_crop_max) {
-  frame_id_ = frame_id;
+      is_frame_ready_(false){
+
 }
 
-double LiPkg::GetSpeed(void) { return speed_ / 360.0; }
+LiPkg::~LiPkg() {
+  
+}
+
+std::string LiPkg::GetSdkVersionNumber() {
+  return sdk_pack_version_;
+}
 
 bool LiPkg::AnalysisOne(uint8_t byte) {
   static enum {
@@ -107,11 +103,11 @@ bool LiPkg::AnalysisOne(uint8_t byte) {
     case DATA:
       tmp[count++] = byte;
       if (count >= pkg_count) {
-        memcpy((uint8_t *)&pkg, tmp, pkg_count);
-        uint8_t crc = CalCRC8((uint8_t *)&pkg, pkg_count - 1);
+        memcpy((uint8_t *)&pkg_, tmp, pkg_count);
+        uint8_t crc = CalCRC8((uint8_t *)&pkg_, pkg_count - 1);
         state = HEADER;
         count = 0;
-        if (crc == pkg.crc8) {
+        if (crc == pkg_.crc8) {
           return true;
         } else {
           error_times_++;
@@ -130,30 +126,25 @@ bool LiPkg::Parse(const uint8_t *data, long len) {
   for (int i = 0; i < len; i++) {
     if (AnalysisOne(data[i])) {
       // parse a package is success
-      double diff = (pkg.end_angle / 100 - pkg.start_angle / 100 + 360) % 360;
-      if (diff > (double)pkg.speed * POINT_PER_PACK / kPointFrequence * 3 / 2) {
+      double diff = (pkg_.end_angle / 100 - pkg_.start_angle / 100 + 360) % 360;
+      if (diff > (double)(pkg_.speed * POINT_PER_PACK / kPointFrequence * 3 / 2)) {
         error_times_++;
       } else {
-        speed_ = pkg.speed; // Degrees per second
-        timestamp_ = pkg.timestamp; // In milliseconds
-        uint32_t diff = ((uint32_t)pkg.end_angle + 36000 - (uint32_t)pkg.start_angle) % 36000;
+        speed_ = pkg_.speed; // Degrees per second
+        timestamp_ = pkg_.timestamp; // In milliseconds
+        uint32_t diff = ((uint32_t)pkg_.end_angle + 36000 - (uint32_t)pkg_.start_angle) % 36000;
         float step = diff / (POINT_PER_PACK - 1) / 100.0;
-        float start = (double)pkg.start_angle / 100.0;
-        float end = (double)(pkg.end_angle % 36000) / 100.0;
+        float start = (double)pkg_.start_angle / 100.0;
         PointData data;
         for (int i = 0; i < POINT_PER_PACK; i++) {
-          data.distance = pkg.point[i].distance;
+          data.distance = pkg_.point[i].distance;
           data.angle = start + i * step;
           if (data.angle >= 360.0) {
             data.angle -= 360.0;
           }
-          data.intensity = pkg.point[i].intensity;
-          one_pkg_[i] = data;
+          data.intensity = pkg_.point[i].intensity;
           frame_tmp_.push_back(PointData(data.angle, data.distance, data.intensity));
         }
-        // prevent angle invert
-        one_pkg_.back().angle = end;
-        is_pkg_ready_ = true;
       }
     }
   }
@@ -170,20 +161,17 @@ bool LiPkg::AssemblePacket() {
     // wait for enough data, need enough data to show a circle
     // enough data has been obtained
     if ((n.angle < 20.0) && (last_angle > 340.0)) {
-      // std::cout << "count: " << count << std::endl;
       if ((count * GetSpeed()) > (kPointFrequence * 1.4)) {
         frame_tmp_.erase(frame_tmp_.begin(), frame_tmp_.begin() + count - 1);
         return false;
       }
       data.insert(data.begin(), frame_tmp_.begin(), frame_tmp_.begin() + count);
-      // std::cout << "data.size() " << data.size() << std::endl;
-      Tofbf tofbfLd06(speed_);
-      tmp = tofbfLd06.NearFilter(data);
-
+      Tofbf tofFilter(speed_);
+      tmp = tofFilter.NearFilter(data);
       std::sort(tmp.begin(), tmp.end(), [](PointData a, PointData b) { return a.angle < b.angle; });
       if (tmp.size() > 0) {
-        ToLaserscan(tmp);
-        is_frame_ready_ = true;
+        SetLaserScanData(tmp);
+        SetFrameReady();
         frame_tmp_.erase(frame_tmp_.begin(), frame_tmp_.begin() + count);
         return true;
       }
@@ -195,92 +183,52 @@ bool LiPkg::AssemblePacket() {
   return false;
 }
 
-const std::array<PointData, POINT_PER_PACK>& LiPkg::GetPkgData(void) {
-  is_pkg_ready_ = false;
-  return one_pkg_;
+double LiPkg::GetSpeed(void) {
+  return (speed_ / 360.0);  // unit is hz
 }
 
-void LiPkg::ToLaserscan(std::vector<PointData> src) {
-  float angle_min, angle_max, range_min, range_max, angle_increment;
+uint16_t LiPkg::GetSpeedOrigin(void) {
+  return speed_;
+}
 
-  // Adjust the parameters according to the demand
-  angle_min = ANGLE_TO_RADIAN(src.front().angle);
-  angle_max = ANGLE_TO_RADIAN(src.back().angle);
-  range_min = 0.02;
-  range_max = 12;
-  angle_increment = ANGLE_TO_RADIAN(speed_ / kPointFrequence);
-  static uint16_t last_times_stamp = 0;
-  float dealt_times_stamp = 0;
-  uint16_t tmp_times_stamp = GetTimestamp();
-  if (tmp_times_stamp - last_times_stamp < 0) {
-    dealt_times_stamp = (tmp_times_stamp - last_times_stamp + 30000)/1000.f;
-  } else {
-    dealt_times_stamp = (tmp_times_stamp - last_times_stamp)/1000.f;
-  }
-  last_times_stamp = tmp_times_stamp;
-  // Calculate the number of scanning points
-  if (speed_ > 0) {
-    unsigned int beam_size = static_cast<unsigned int>(ceil((angle_max - angle_min) / angle_increment));
-    output_.header.stamp = ros::Time::now();
-    output_.header.frame_id = frame_id_;
-    output_.angle_min = angle_min;
-    output_.angle_max = angle_max;
-    output_.range_min = range_min;
-    output_.range_max = range_max;
-    output_.angle_increment = angle_increment;
-    if (beam_size <= 1) {
-      output_.time_increment = 0;
-    } else {
-      output_.time_increment = dealt_times_stamp/(beam_size-1);
-    }
-    output_.scan_time = dealt_times_stamp;
-    // First fill all the data with Nan
-    output_.ranges.assign(beam_size, std::numeric_limits<float>::quiet_NaN());
-    output_.intensities.assign(beam_size, std::numeric_limits<float>::quiet_NaN());
+uint16_t LiPkg::GetTimestamp(void) {
+  return timestamp_; 
+}
 
-    unsigned int last_index = 0;
-    for (auto point : src) {
-      float range = point.distance / 1000.f;  // distance unit transform to meters
-      float intensity = point.intensity;      // laser receive intensity 
-      float dir_angle;
+bool LiPkg::IsFrameReady(void) {
+  return is_frame_ready_; 
+}  
 
-      if (laser_scan_dir_) {
-        dir_angle = static_cast<float>(360.f - point.angle); // Lidar rotation data flow changed 
-                                                             // from clockwise to counterclockwise
-      } else {
-        dir_angle = point.angle;
-      }
+void LiPkg::ResetFrameReady(void) {
+  std::lock_guard<std::mutex> lg(mutex_lock1_);
+  is_frame_ready_ = false;
+}
 
-      if (enable_angle_crop_func_) { // Angle crop setting, Mask data within the set angle range
-        if ((dir_angle >= angle_crop_min_) && (dir_angle <= angle_crop_max_)) {
-          range = std::numeric_limits<float>::quiet_NaN();
-          intensity = std::numeric_limits<float>::quiet_NaN();
-        }
-      }
+void LiPkg::SetFrameReady(void) {
+  std::lock_guard<std::mutex> lg(mutex_lock1_);
+  is_frame_ready_ = true;
+}
 
-      float angle = ANGLE_TO_RADIAN(dir_angle); // Lidar angle unit form degree transform to radian
-      unsigned int index = (unsigned int)((angle - output_.angle_min) / output_.angle_increment);
-      if (index < beam_size) {
-        // If the current content is Nan, it is assigned directly
-        if (std::isnan(output_.ranges[index])) {
-          output_.ranges[index] = range;
-          unsigned int err = index - last_index;
-          if (err == 2){
-            output_.ranges[index - 1] = range;
-            output_.intensities[index - 1] = intensity;
-          }
-        } else { // Otherwise, only when the distance is less than the current
-                //   value, it can be re assigned
-          if (range < output_.ranges[index]) {
-            output_.ranges[index] = range;
-          }
-        }
-        output_.intensities[index] = intensity;
-        last_index = index;
-      }
-    }
+long LiPkg::GetErrorTimes(void) {
+  return error_times_; 
+}
+
+void LiPkg::CommReadCallback(const char *byte, size_t len) {
+  if (this->Parse((uint8_t *)byte, len)) {
+    this->AssemblePacket();
   }
 }
 
+Points2D LiPkg::GetLaserScanData(void) {
+  std::lock_guard<std::mutex> lg(mutex_lock2_);
+  return laser_scan_data_;
+}
+
+void LiPkg::SetLaserScanData(Points2D& src) {
+  std::lock_guard<std::mutex> lg(mutex_lock2_);
+  laser_scan_data_ = src;
+}
+
+} // namespace ldlidar
 /********************* (C) COPYRIGHT SHENZHEN LDROBOT CO., LTD *******END OF
  * FILE ********/

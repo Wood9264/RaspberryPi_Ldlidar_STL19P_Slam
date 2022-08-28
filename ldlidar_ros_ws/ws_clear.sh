@@ -10,5 +10,3 @@ echo "del devel floder"
 rm -rf ./src/CMakeLists.txt
 echo "del src/CMakeLists.txt file"
 echo "del is ok....."
-
-

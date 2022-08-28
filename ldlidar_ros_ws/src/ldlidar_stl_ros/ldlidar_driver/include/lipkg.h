@@ -22,14 +22,13 @@
 #ifndef __LIPKG_H
 #define __LIPKG_H
 
-#include <sensor_msgs/LaserScan.h>
-#include <stdint.h>
+#include <chrono>
 
-#include <array>
-#include <iostream>
-#include <vector>
-
+#include "cmd_interface_linux.h"
 #include "pointdata.h"
+#include "tofbf.h"
+
+namespace ldlidar {
 
 enum {
   PKG_HEADER = 0x54,
@@ -55,50 +54,50 @@ typedef struct __attribute__((packed)) {
 
 class LiPkg {
  public:
-  LiPkg(std::string frame_id, bool laser_scan_dir, bool enable_angle_crop_func,
-  double angle_crop_min, double angle_crop_max);
+  const int kPointFrequence = 4500;
+
+  LiPkg();
+  ~LiPkg();
+  // get sdk pack version Number
+  std::string GetSdkVersionNumber();
   // get Lidar spin speed (Hz)
   double GetSpeed(void); 
+  // get lidar spind speed (degree per second) origin
+  uint16_t GetSpeedOrigin(void);
   // get time stamp of the packet
-  uint16_t GetTimestamp(void) { return timestamp_; }  
-  // a packet is ready                                              
-  bool IsPkgReady(void) { return is_pkg_ready_; }  
+  uint16_t GetTimestamp(void);  
   // Get lidar data frame ready flag  
-  bool IsFrameReady(void) { return is_frame_ready_; }  
+  bool IsFrameReady(void);  
   // Lidar data frame readiness flag reset
-  void ResetFrameReady(void) { is_frame_ready_ = false; }
+  void ResetFrameReady(void);
+  void SetFrameReady(void);
   // the number of errors in parser process of lidar data frame
-  long GetErrorTimes(void) { return error_times_; } 
-  // Get original Lidar data package
-  const std::array<PointData, POINT_PER_PACK>& GetPkgData(void);  
-  // parse single packet
+  long GetErrorTimes(void);  
+  void CommReadCallback(const char *byte, size_t len);
+  Points2D GetLaserScanData(void);
+  
+ private:
+  std::string sdk_pack_version_;
+  uint16_t timestamp_;
+  double speed_;
+  long error_times_;
+  bool is_frame_ready_;
+  LiDARFrameTypeDef pkg_;
+  std::vector<uint8_t> data_tmp_;
+  Points2D frame_tmp_;
+  Points2D laser_scan_data_;
+  std::mutex  mutex_lock1_;
+  std::mutex  mutex_lock2_;
+
+   // parse single packet
   bool AnalysisOne(uint8_t byte);
   bool Parse(const uint8_t* data, long len);  
   // combine stantard data into data frames and calibrate
   bool AssemblePacket();  
-  // Get sensor_msg/LaserScan type data
-  sensor_msgs::LaserScan GetLaserScan() { return output_; }
-
- private:
-  const int kPointFrequence = 4500;
-  std::string frame_id_;
-  uint16_t timestamp_;
-  double speed_;
-  long error_times_;
-  bool is_pkg_ready_;
-  bool is_frame_ready_;
-  bool laser_scan_dir_;
-  bool enable_angle_crop_func_;
-  double angle_crop_min_;
-  double angle_crop_max_;
-  LiDARFrameTypeDef pkg;
-  std::vector<uint8_t> data_tmp_;
-  std::array<PointData, POINT_PER_PACK> one_pkg_;
-  std::vector<PointData> frame_tmp_;
-  sensor_msgs::LaserScan output_;
-  // Lidar frame data tranfrom to  sensor_msg/LaserScan type data
-  void ToLaserscan(std::vector<PointData> src);
+  void SetLaserScanData(Points2D& src);
 };
+
+} // namespace ldlidar
 
 #endif  //__LIPKG_H
 
