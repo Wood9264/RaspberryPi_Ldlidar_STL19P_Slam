@@ -1,0 +1,9 @@
+ldlidar_ros_ws/build/
+
+ldlidar_ros_ws/devel/
+
+ldlidar_ros_ws/.catkin_workspace
+
+ldlidar_ros_ws/.vscode/
+
+ldlidar_ros_ws/src/CMakeLists.txt
