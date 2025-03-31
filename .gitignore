@@ -7,3 +7,5 @@ ldlidar_ros_ws/.catkin_workspace
 ldlidar_ros_ws/.vscode/
 
 ldlidar_ros_ws/src/CMakeLists.txt
+
+*.code-workspace
