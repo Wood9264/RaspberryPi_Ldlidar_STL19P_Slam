@@ -1,4 +1,5 @@
 <launch>
     <include file="$(find rosbridge_server)/launch/rosbridge_websocket.launch"></include>
+    <node name="board" pkg="rosboard" type="rosboard_node" output="screen"></node>
     <node name="web_server" pkg="web_controller" type="start_http_server.py" output="screen"></node>
 </launch>
