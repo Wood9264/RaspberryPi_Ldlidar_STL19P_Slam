@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+    }
+
+    button {
+      margin: 5px;
+      padding: 10px 20px;
+      font-size: 18px;
+      border: 2px solid #3498db;
+      border-radius: 5px;
+      background-color: #3498db;
+      color: #ffffff;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/roslib@1.3.0/build/roslib.js"></script>
+</head>
+
+<body>
+  <h1>ROS Web Controller</h1>
+  <div>
+    <button onclick="moveForward()">Forward</button>
+    <button onclick="moveBackward()">Backward</button>
+  </div>
+  <div>
+    <button onclick="moveLeft()">Left</button>
+    <button onclick="stopMovement()">Stop</button>
+    <button onclick="moveRight()">Right</button>
+  </div>
+
+  <script>
+    let ros;
+    let cmdVel;
+
+    function startConnection() {
+      ros = new ROSLIB.Ros({
+        url: 'ws://192.168.50.130:9090' // 替换为你的Rosbridge服务器地址,主要将 localhost 改成你的主机IP地址，比如 ws://192.168.1.2:9090
+      });
+
+      ros.on('connection', () => {
+        console.log('Connected to ROS Bridge');
+        cmdVel = new ROSLIB.Topic({
+          ros: ros,
+          name: '/cmd_vel',
+          messageType: 'geometry_msgs/Twist'
+        });
+      });
+
+      ros.on('error', (error) => {
+        console.error('Error connecting to ROS: ', error);
+        alert('Error connecting to ROS: 9090', error);
+      });
+
+      ros.on('close', () => {
+        console.log('Disconnected from ROS');
+        alert('Disconnected from ROS');
+      });
+    }
+
+    function move(direction) {
+      if (!ros) {
+        console.error('ROS connection not established');
+        alert('ROS connection not established');
+        return;
+      }
+
+      if (!cmdVel) {
+        console.error('Publisher not created');
+        alert('Publisher not created');
+        return;
+      }
+
+      const twist = new ROSLIB.Message({
+        linear: {
+          x: direction.linear.x,
+          y: direction.linear.y,
+          z: direction.linear.z
+        },
+        angular: {
+          x: direction.angular.x,
+          y: direction.angular.y,
+          z: direction.angular.z
+        }
+      });
+
+      cmdVel.publish(twist);
+    }
+
+    function moveForward() {
+      const moveForwardMsg = {
+        linear: { x: 0.2, y: 0, z: 0 },
+        angular: { x: 0, y: 0, z: 0 }
+      };
+      move(moveForwardMsg);
+    }
+
+    function moveBackward() {
+      const moveBackwardMsg = {
+        linear: { x: -0.2, y: 0, z: 0 },
+        angular: { x: 0, y: 0, z: 0 }
+      };
+      move(moveBackwardMsg);
+    }
+
+    function moveLeft() {
+      const moveLeftMsg = {
+        linear: { x: 0, y: 0.0, z: 0 },
+        angular: { x: 0, y: 0, z: 0.5 }
+      };
+      move(moveLeftMsg);
+    }
+
+    function moveRight() {
+      const moveRightMsg = {
+        linear: { x: 0, y: 0, z: 0 },
+        angular: { x: 0, y: 0, z: -0.5 }
+      };
+      move(moveRightMsg);
+    }
+
+    function stopMovement() {
+      const stopMsg = {
+        linear: { x: 0, y: 0, z: 0 },
+        angular: { x: 0, y: 0, z: 0 }
+      };
+      move(stopMsg);
+    }
+
+    startConnection(); // 初始化ROS连接
+  </script>
+</body>
+
+</html>
+
