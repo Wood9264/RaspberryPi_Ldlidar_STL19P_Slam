@@ -9,6 +9,7 @@ import sys
 import threading
 import socket
 import time
+import netifaces  # 需要安装: pip install netifaces
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     """处理请求的线程化版本的HTTP服务器"""
@@ -104,6 +105,42 @@ class GracefulHTTPServer:
                 rospy.logerr("无法找到可用端口，HTTP服务器将不会启动")
                 return False
     
+    def _get_ip_addresses(self):
+        """获取所有网络接口的IP地址"""
+        ip_addresses = []
+        
+        try:
+            # 获取所有网络接口
+            interfaces = netifaces.interfaces()
+            
+            for interface in interfaces:
+                # 获取该接口的所有地址信息
+                addrs = netifaces.ifaddresses(interface)
+                
+                # 只处理IPv4地址 (AF_INET)
+                if netifaces.AF_INET in addrs:
+                    for addr in addrs[netifaces.AF_INET]:
+                        ip = addr['addr']
+                        ip_addresses.append((interface, ip))
+            
+            return ip_addresses
+            
+        except Exception as e:
+            rospy.logwarn(f"获取IP地址时出错: {str(e)}")
+            # 如果netifaces出错，使用备用方法
+            try:
+                hostname = socket.gethostname()
+                ip = socket.gethostbyname(hostname)
+                ip_addresses.append(("default", ip))
+                
+                # 添加回环地址
+                ip_addresses.append(("lo", "127.0.0.1"))
+                
+                return ip_addresses
+            except Exception as e2:
+                rospy.logerr(f"获取IP地址的备用方法也失败: {str(e2)}")
+                return [("unknown", "获取IP地址失败")]
+    
     def start(self):
         """在单独的线程中启动HTTP服务器"""
         if self.server_running or self.httpd is None:
@@ -113,8 +150,15 @@ class GracefulHTTPServer:
         self.server_thread = threading.Thread(target=self._run_server)
         self.server_thread.daemon = True
         self.server_thread.start()
+        
+        # 获取所有IP地址并输出
+        ip_addresses = self._get_ip_addresses()
+        
         rospy.loginfo(f"HTTP服务器已启动，地址: 0.0.0.0:{self.PORT}")
-        rospy.loginfo(f"请在浏览器中访问 http://YOUR_IP_ADDRESS:{self.PORT}")
+        
+        # 输出每个网卡的IP地址
+        for interface, ip in ip_addresses:
+            rospy.loginfo(f"请在浏览器中访问 http://{ip}:{self.PORT} ({interface})")
     
     def _run_server(self):
         """运行HTTP服务器的内部方法"""
