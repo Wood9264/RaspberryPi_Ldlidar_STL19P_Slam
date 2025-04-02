@@ -49,6 +49,22 @@
     .connection-info {
       margin-bottom: 20px;
     }
+    
+    /* 添加用于显示cmd_vel的样式 */
+    .velocity-display {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      background-color: #f9f9f9;
+      width: 300px;
+      text-align: center;
+    }
+    
+    .velocity-value {
+      font-family: monospace;
+      font-size: 14px;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/roslib@1.3.0/build/roslib.js"></script>
 </head>
@@ -75,9 +91,18 @@
     <button onclick="moveRight()">Right</button>
   </div>
 
+  <!-- 添加cmd_vel显示区域 -->
+  <div class="velocity-display">
+    <h3>当前速度命令</h3>
+    <div id="cmd-vel-display" class="velocity-value">
+      等待数据...
+    </div>
+  </div>
+
   <script>
     let ros;
     let cmdVel;
+    let cmdVelSubscriber; // 添加订阅者变量
     const statusElement = document.getElementById('status');
 
     function connect() {
@@ -108,6 +133,18 @@
           name: '/cmd_vel',
           messageType: 'geometry_msgs/Twist'
         });
+
+        // 创建订阅者
+        cmdVelSubscriber = new ROSLIB.Topic({
+          ros: ros,
+          name: '/cmd_vel',
+          messageType: 'geometry_msgs/Twist'
+        });
+        
+        // 订阅并处理接收到的消息
+        cmdVelSubscriber.subscribe(function(message) {
+          updateCmdVelDisplay(message);
+        });
       });
 
       ros.on('error', (error) => {
@@ -120,7 +157,21 @@
         console.log('Disconnected from ROS');
         statusElement.innerHTML = '已断开连接';
         statusElement.className = 'status disconnected';
+        
+        if (cmdVelSubscriber) {
+          cmdVelSubscriber.unsubscribe();
+        }
+        
+        document.getElementById('cmd-vel-display').innerHTML = '等待数据...';
       });
+    }
+
+    // 添加更新显示的函数
+    function updateCmdVelDisplay(message) {
+      const cmdVelDisplay = document.getElementById('cmd-vel-display');
+      const formattedMsg = `线速度: [x: ${message.linear.x.toFixed(2)}, y: ${message.linear.y.toFixed(2)}, z: ${message.linear.z.toFixed(2)}]<br>
+                            角速度: [x: ${message.angular.x.toFixed(2)}, y: ${message.angular.y.toFixed(2)}, z: ${message.angular.z.toFixed(2)}]`;
+      cmdVelDisplay.innerHTML = formattedMsg;
     }
 
     function move(direction) {
@@ -150,6 +201,8 @@
       });
 
       cmdVel.publish(twist);
+      // 直接更新显示，无需等待订阅回调
+      updateCmdVelDisplay(twist);
     }
 
     function moveForward() {
