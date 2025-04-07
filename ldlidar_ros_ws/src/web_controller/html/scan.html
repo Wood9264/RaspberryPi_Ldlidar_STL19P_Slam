@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+ 
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ros2d</title>
+  <script type="text/javascript" src="./jslib/eventemitter2.min.js"></script>
+  <script type="text/javascript" src="./jslib/roslib.js"></script>
+  <script type="text/javascript" src="./jslib/easeljs.min.js"></script>
+  <script type="text/javascript" src="./jslib/ros2d.min.js"></script>
+  <script type="text/javascript" src="./jslib/three.min.js"></script>
+  <style>
+    .main {
+      display: flex;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+ 
+<body>
+  <div class="main">
+    <button onclick="displayLaserScan()">显示雷达</button>
+    <div id="map"></div>
+  </div>
+ 
+  <script>
+    var ros = new ROSLIB.Ros({
+      url: 'ws://192.168.50.130:9090'
+    });
+ 
+    ros.on('connection', function () {
+      console.log('Connected to ROS');
+    });
+ 
+    ros.on('error', function (error) {
+      console.log('Error connecting to ROS:', error);
+    });
+ 
+    ros.on('close', function () {
+      console.log('Disconnected from ROS');
+    });
+ 
+    var viewer = new ROS2D.Viewer({
+      divID: 'map',
+      width: 1200,
+      height: 800
+    });
+ 
+    var gridClient = new ROS2D.OccupancyGridClient({
+      ros: ros,
+      rootObject: viewer.scene,
+      continuous: true
+    });
+ 
+    gridClient.on('change', function () {
+      viewer.scaleToDimensions(gridClient.currentGrid.width, gridClient.currentGrid.height);
+      viewer.shift(gridClient.currentGrid.pose.position.x, gridClient.currentGrid.pose.position.y);
+    });
+ 
+    // 雷达显示
+    function getYawFromQuat(q) {
+      var quat = new THREE.Quaternion(q.x, q.y, q.z, q.w);
+      var yaw = new THREE.Euler().setFromQuaternion(quat);
+      return yaw["_z"] * (180 / Math.PI);
+    }
+ 
+    var base_footprint_tf = null;
+    var tf_client = new ROSLIB.TFClient({
+      ros: ros,
+      fixedFrame: "/map",
+      angularThres: 0.01,
+      transThres: 0.01
+    });
+    tf_client.subscribe("/scan", function (tf) {   //Maybe /scan in your project
+      base_footprint_tf = tf;
+    });
+ 
+    function displayLaserScan() {
+      let marker_radius = 0.03;
+      let marker_fill_color = createjs.Graphics.getRGB(255, 0, 0, 1.0);
+      let laser_listener = new ROSLIB.Topic({
+        ros: ros,
+        name: '/scan',
+        messageType: 'sensor_msgs/LaserScan'
+      });
+      let prev_markers = null;
+      laser_listener.subscribe(function (msg) {
+        const num = msg.ranges.length
+        const angles = Array.from({ length: num }, (_, i) => msg.angle_min + (msg.angle_max - msg.angle_min) / num * i);
+        const poses_2d = angles.flatMap((angle, index) => {
+          const range = msg.ranges[index];
+          if (range > msg.range_min && range < msg.range_max) {
+            return [[Math.cos(angle) * range, Math.sin(angle) * range, -angle]]
+          }
+          return []  // Skip this point
+        });
+        if (base_footprint_tf === null) {
+          console.log('no tf');
+          return;
+        }
+        // TODO: We might be able to apply the tf transform to the container itself, and dont have to do it on each pose.
+        // Init the graphics component
+        const scan_markers = new createjs.Container();
+        const graphics = new createjs.Graphics().beginFill(marker_fill_color).drawCircle(0, 0, marker_radius).endFill();
+ 
+        // Transform each point and add it to the graphics
+        poses_2d.forEach(pt => {
+          // pt[2] += Math.PI / 2
+          const pose = new ROSLIB.Pose({
+            position: new ROSLIB.Vector3({
+              x: pt[0], y: pt[1], z: 0
+            }), orientation: new ROSLIB.Quaternion({
+              x: 0, y: 0, z: Math.cos(pt[2]), w: Math.sin(pt[2])
+            })
+          });
+          pose.applyTransform(base_footprint_tf)
+          const marker = new createjs.Shape(graphics)
+          marker.x = pose.position.x;
+          marker.y = -pose.position.y;
+          marker.rotation = - getYawFromQuat(pose.orientation).toFixed(2);
+          scan_markers.addChild(marker)
+        });
+ 
+        // TODO: Just update the old one, dont make new ones everytime
+        if (this.prev_markers !== null) {
+          viewer.scene.removeChild(prev_markers);
+        }
+        viewer.addObject(scan_markers);
+        prev_markers = scan_markers;
+      });
+    }
+  </script>
+</body>
+ 
+</html>
