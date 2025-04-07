@@ -65,6 +65,23 @@
       font-family: monospace;
       font-size: 14px;
     }
+
+    /* 激光点云显示区域样式 */
+    .scan-display {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      background-color: #f9f9f9;
+      width: 400px;
+      text-align: center;
+    }
+    
+    #scan-canvas {
+      border: 1px solid #333;
+      background-color: #000;
+      margin: 10px auto;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/roslib@1.3.0/build/roslib.js"></script>
 </head>
@@ -99,11 +116,18 @@
     </div>
   </div>
 
+  <!-- 添加激光点云显示区域 -->
+  <div class="scan-display">
+    <h3>激光点云数据</h3>
+    <canvas id="scan-canvas" width="360" height="360"></canvas>
+  </div>
+
   <script>
     let ros;
     let cmdVel;
-    let cmdVelSubscriber; // 添加订阅者变量
+    let scanSubscriber; // 替换为scan订阅者
     const statusElement = document.getElementById('status');
+    let canvas, ctx; // 画布和上下文
 
     function connect() {
       // 断开现有连接（如果有）
@@ -111,6 +135,14 @@
         ros.close();
       }
 
+      // 初始化画布
+      canvas = document.getElementById('scan-canvas');
+      ctx = canvas.getContext('2d');
+      
+      // 清空画布
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
       // 获取当前页面的主机名/IP地址
       const currentHost = window.location.hostname;
       const port = document.getElementById('port').value;
@@ -134,16 +166,16 @@
           messageType: 'geometry_msgs/Twist'
         });
 
-        // 创建订阅者
-        cmdVelSubscriber = new ROSLIB.Topic({
+        // 创建激光扫描订阅者
+        scanSubscriber = new ROSLIB.Topic({
           ros: ros,
-          name: '/cmd_vel',
-          messageType: 'geometry_msgs/Twist'
+          name: '/scan',
+          messageType: 'sensor_msgs/LaserScan'
         });
         
-        // 订阅并处理接收到的消息
-        cmdVelSubscriber.subscribe(function(message) {
-          updateCmdVelDisplay(message);
+        // 订阅激光扫描数据
+        scanSubscriber.subscribe(function(message) {
+          displayScanData(message);
         });
       });
 
@@ -158,9 +190,13 @@
         statusElement.innerHTML = '已断开连接';
         statusElement.className = 'status disconnected';
         
-        if (cmdVelSubscriber) {
-          cmdVelSubscriber.unsubscribe();
+        if (scanSubscriber) {
+          scanSubscriber.unsubscribe();
         }
+        
+        // 清空画布
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         document.getElementById('cmd-vel-display').innerHTML = '等待数据...';
       });
@@ -172,6 +208,68 @@
       const formattedMsg = `线速度: [x: ${message.linear.x.toFixed(2)}, y: ${message.linear.y.toFixed(2)}, z: ${message.linear.z.toFixed(2)}]<br>
                             角速度: [x: ${message.angular.x.toFixed(2)}, y: ${message.angular.y.toFixed(2)}, z: ${message.angular.z.toFixed(2)}]`;
       cmdVelDisplay.innerHTML = formattedMsg;
+    }
+
+    // 添加处理激光扫描数据的函数
+    function displayScanData(message) {
+      if (!ctx || !canvas) return;
+      
+      // 清空画布
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // 设置点的样式
+      ctx.fillStyle = 'lime';
+      
+      // 计算中心点
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      
+      // 获取扫描参数
+      const angleMin = message.angle_min;
+      const angleIncrement = message.angle_increment;
+      const rangeMax = message.range_max;
+      
+      // 缩放因子 - 使点云尺寸适应画布
+      const scaleFactor = Math.min(canvas.width, canvas.height) / (2 * rangeMax) * 0.8;
+      
+      // 绘制机器人位置
+      ctx.fillStyle = 'red';
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 绘制点云
+      ctx.fillStyle = 'lime';
+      for (let i = 0; i < message.ranges.length; i++) {
+        const range = message.ranges[i];
+        
+        // 跳过无效的读数
+        if (range < message.range_min || range > message.range_max) continue;
+        
+        // 计算当前角度
+        const angle = angleMin + (i * angleIncrement);
+        
+        // 将极坐标转换为笛卡尔坐标
+        // 注意: 激光扫描通常以前方为0度，右侧为负角度，左侧为正角度
+        // 而canvas坐标系是以向右为x轴正方向，向下为y轴正方向
+        const x = centerX + Math.cos(angle) * range * scaleFactor;
+        const y = centerY - Math.sin(angle) * range * scaleFactor; // 注意y轴方向取反
+        
+        // 绘制点
+        ctx.beginPath();
+        ctx.arc(x, y, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      // 绘制坐标轴
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.beginPath();
+      ctx.moveTo(centerX, 0);
+      ctx.lineTo(centerX, canvas.height);
+      ctx.moveTo(0, centerY);
+      ctx.lineTo(canvas.width, centerY);
+      ctx.stroke();
     }
 
     function move(direction) {
