@@ -2,38 +2,50 @@
 <html>
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <script type="text/javascript" src="./jslib/three.js"></script>
 <script type="text/javascript" src="./jslib/eventemitter2.js"></script>
 <script type="text/javascript" src="./jslib/roslib.js"></script>
 <script type="text/javascript" src="./jslib/ros3d.js"></script>
 
-<script type="text/javascript" type="text/javascript">
+<script type="text/javascript">
+
+var ros,
+    viewer,
+    gridClient,
+    laserScan;
+
   /**
    * Setup all visualization elements when the page is loaded.
    */
   function init() {
     // Connect to ROS.
-    var ros = new ROSLIB.Ros({
+    ros = new ROSLIB.Ros({
       url : 'ws://192.168.50.130:9090'
     });
 
     // Create the main viewer.
-    var viewer = new ROS3D.Viewer({
+    viewer = new ROS3D.Viewer({
       divID : 'map',
       width : 800,
       height : 600,
       antialias : false //禁用抗锯齿以提高性能
     });
 
+    //初始化相机位置
+    viewer.cameraControls.camera.position.x = -0.0000001;
+    viewer.cameraControls.camera.position.y = 0;
+    viewer.cameraControls.camera.position.z = 10;
+
     // Setup the map client.
-    var gridClient = new ROS3D.OccupancyGridClient({
+    gridClient = new ROS3D.OccupancyGridClient({
       ros : ros,
       rootObject : viewer.scene,
       continuous : true,
     });
 
-    var laserScan = new ROS3D.LaserScan({
+    laserScan = new ROS3D.LaserScan({
       ros : ros,
       rootObject : viewer.scene,
       topic : '/scan',
@@ -50,11 +62,30 @@
       }
     });
   }
+
+  function bottom1() {
+    viewer.cameraControls.camera.position.x = 0;
+    viewer.cameraControls.camera.position.y = 0.74;
+    viewer.cameraControls.camera.position.z = 5;
+  }
+
+  function bottom2() {
+    viewer.cameraControls.center.x = 0;
+    viewer.cameraControls.center.y = 0.74;
+    viewer.cameraControls.center.z = 0;
+  }
+
+  function bottom3() {
+    viewer.start();
+  }
 </script>
 </head>
 
 <body onload="init()">
   <h1>Simple Map Example</h1>
+  <button type="button" onclick="bottom1()">button1</button>
+  <button type="button" onclick="bottom2()">button2</button>
+  <button type="button" onclick="bottom3()">button3</button>
   <div id="map"></div>
 </body>
 </html>
