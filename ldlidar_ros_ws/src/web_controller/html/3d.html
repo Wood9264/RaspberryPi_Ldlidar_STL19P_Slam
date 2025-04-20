@@ -51,6 +51,20 @@ var ros,
     gridClient,
     laserScan;
 
+  //设置相机位置
+  function setCameraPosition(x, y, z) {
+    viewer.cameraControls.camera.position.x = x;
+    viewer.cameraControls.camera.position.y = y;
+    viewer.cameraControls.camera.position.z = z;
+  }
+
+  //设置中心位置
+  function setCenterPosition(x, y, z) {
+    viewer.cameraControls.center.x = x;
+    viewer.cameraControls.center.y = y;
+    viewer.cameraControls.center.z = z;
+  }
+
   /**
    * Setup all visualization elements when the page is loaded.
    */
@@ -69,9 +83,7 @@ var ros,
     });
 
     //初始化相机位置
-    viewer.cameraControls.camera.position.x = -0.0000001;
-    viewer.cameraControls.camera.position.y = 0;
-    viewer.cameraControls.camera.position.z = 10;
+    setCameraPosition(-0.0000001, 0, 10);
 
     // Setup the map client.
     gridClient = new ROS3D.OccupancyGridClient({
@@ -137,7 +149,62 @@ var ros,
         color: 'red',
         size: 300,
     };
-  var joystick = nipplejs.create(options);
+
+    var joystick = nipplejs.create(options);
+    
+    // 摇杆状态
+    var joystickState = {
+        active: false,
+        distance: 0,
+        angle: 0
+    };
+
+    // 更新相机位置
+    function updateCamera() {
+        if (joystickState.active) {
+            var cameraX = viewer.cameraControls.camera.position.x;
+            var cameraY = viewer.cameraControls.camera.position.y;
+            var cameraZ = viewer.cameraControls.camera.position.z;
+            var centerX = viewer.cameraControls.center.x;
+            var centerY = viewer.cameraControls.center.y;
+            var centerZ = viewer.cameraControls.center.z;
+
+            // 计算二维相机朝向向量
+            var cameraDirection = new THREE.Vector2();
+            cameraDirection.subVectors(viewer.cameraControls.center, viewer.cameraControls.camera.position);
+            // 计算二维相机朝向的角度
+            var cameraAngle = Math.atan2(cameraDirection.y, cameraDirection.x);
+            console.log('cameraAngle:', cameraAngle);
+
+            // 计算新的相机位置
+            cameraX += joystickState.distance * Math.sin(joystickState.angle + cameraAngle) * 0.001;
+            cameraY += joystickState.distance * -Math.cos(joystickState.angle + cameraAngle) * 0.001;
+            centerX += joystickState.distance * Math.sin(joystickState.angle + cameraAngle) * 0.001;
+            centerY += joystickState.distance * -Math.cos(joystickState.angle + cameraAngle) * 0.001;
+
+            // 设置新的相机位置
+            setCameraPosition(cameraX, cameraY, cameraZ);
+            setCenterPosition(centerX, centerY, centerZ);
+        }
+        requestAnimationFrame(updateCamera);
+    }
+
+    // 启动动画循环
+    updateCamera();
+
+    // 摇杆移动事件
+    joystick.on('move', function (evt, data) {
+        joystickState.active = true;
+        joystickState.distance = data.distance;
+        joystickState.angle = data.angle.radian;
+    });
+
+    // 摇杆释放事件
+    joystick.on('end', function () {
+        joystickState.active = false;
+        joystickState.distance = 0;
+        joystickState.angle = 0;
+    });
   </script>
 </body>
 </html>
