@@ -148,18 +148,22 @@ var ros,
     // 更新相机位置
     function updateCamera() {
         if (joystickState.active) {
+            // 相机与中心点距离为1时，摇杆单位距离对应的相机移动距离参数
+            var cameraDistancePerJoystickUnit = 0.00015;
+
             // 计算相机朝向二维向量
             var cameraDirection = new THREE.Vector2();
             cameraDirection.subVectors(viewer.cameraControls.center, viewer.cameraControls.camera.position);
             // 计算相机朝向的角度
             var cameraAngle = Math.atan2(cameraDirection.y, cameraDirection.x);
-            console.log('cameraAngle:', cameraAngle);
+            // 计算相机和中心点的距离
+            var cameraDistance = viewer.cameraControls.camera.position.distanceTo(viewer.cameraControls.center);
 
             // 计算相机和中心点移动的增量
-            var cameraDeltaX = joystickState.distance * Math.sin(joystickState.angle + cameraAngle) * 0.001;
-            var cameraDeltaY = joystickState.distance * -Math.cos(joystickState.angle + cameraAngle) * 0.001;
-            var centerDeltaX = joystickState.distance * Math.sin(joystickState.angle + cameraAngle) * 0.001;
-            var centerDeltaY = joystickState.distance * -Math.cos(joystickState.angle + cameraAngle) * 0.001;
+            var cameraDeltaX = joystickState.distance * Math.sin(joystickState.angle + cameraAngle) * cameraDistancePerJoystickUnit * cameraDistance;
+            var cameraDeltaY = joystickState.distance * -Math.cos(joystickState.angle + cameraAngle) * cameraDistancePerJoystickUnit * cameraDistance;
+            var centerDeltaX = joystickState.distance * Math.sin(joystickState.angle + cameraAngle) * cameraDistancePerJoystickUnit * cameraDistance;
+            var centerDeltaY = joystickState.distance * -Math.cos(joystickState.angle + cameraAngle) * cameraDistancePerJoystickUnit * cameraDistance;
 
             viewer.cameraControls.camera.position.add(new THREE.Vector3(cameraDeltaX, cameraDeltaY, 0));
             viewer.cameraControls.center.add(new THREE.Vector3(centerDeltaX, centerDeltaY, 0));
