@@ -109,7 +109,7 @@ var ros,
 
 function init() {
     // 获取当前页面的主机名/IP地址
-    const currentHost = window.location.hostname;
+    const currentHost = window.location.hostname || 'localhost';
     const port = document.getElementById('port').value;
     const rosbridgeUrl = `ws://${currentHost}:${port}`;
     
