@@ -139,21 +139,26 @@ function init() {
         console.log('Disconnected from ROS');
         statusElement.innerHTML = '已断开连接';
         statusElement.className = 'status disconnected';
+        cleanupViewer();  // 断开时清理实例
     });
 }
 
-// 将原来init函数中的viewer初始化等代码移到这个新函数中
 function initializeViewer() {
-    // Create the main viewer.
-    viewer = new ROS3D.Viewer({
-        divID : 'map',
-        width : document.documentElement.clientWidth / 2,
-        height : document.documentElement.clientHeight,
-        antialias : false //禁用抗锯齿以提高性能
-    });
+    // 清理旧的订阅和场景对象
+    cleanupViewer();
 
-    //初始化相机位置
-    viewer.cameraControls.camera.position.set(-0.0000001, 0, 10);
+    // 如果viewer不存在才创建新的实例
+    if (!viewer) {
+        viewer = new ROS3D.Viewer({
+            divID : 'map',
+            width : document.documentElement.clientWidth / 2,
+            height : document.documentElement.clientHeight,
+            antialias : false
+        });
+
+        //初始化相机位置
+        viewer.cameraControls.camera.position.set(-0.0000001, 0, 10);
+    }
 
     // Setup the map client.
     gridClient = new ROS3D.OccupancyGridClient({
@@ -180,12 +185,38 @@ function initializeViewer() {
     });
 }
 
-// 添加连接函数
 function connect() {
     if (ros) {
         ros.close();
+        cleanupViewer();  // 清理旧的实例
     }
     init();
+}
+
+// 清理viewer和订阅的对象
+function cleanupViewer() {
+    if (laserScan) {
+        laserScan.unsubscribe();
+        if (viewer && viewer.scene) {
+            viewer.scene.remove(laserScan);
+        }
+        laserScan = null;
+    }
+    
+    if (gridClient) {
+        gridClient.unsubscribe();
+        if (viewer && viewer.scene) {
+            viewer.scene.remove(gridClient);
+        }
+        gridClient = null;
+    }
+
+    if (viewer && viewer.scene) {
+        // 只清理场景中的对象，保留viewer实例
+        while(viewer.scene.children.length > 0){ 
+            viewer.scene.remove(viewer.scene.children[0]); 
+        }
+    }
 }
 
   function bottom1() {
