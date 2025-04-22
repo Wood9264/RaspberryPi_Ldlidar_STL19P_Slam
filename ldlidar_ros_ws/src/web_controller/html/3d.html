@@ -5,36 +5,42 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
 <style>
-  /* body {
-    display: flex;
-    background-color: aquamarine;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    font-family: Arial, sans-serif;
-  } */
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;  /* 防止出现滚动条 */
+  }
 
-  /* 添加容器样式 */
   .container {
     display: flex;
-    flex-direction: row;
-    gap: 20px;  /* 元素之间的间距 */
-    align-items: flex-start;  /* 顶部对齐 */
+    width: 100vw;     /* 占满整个视口宽度 */
+    height: 100vh;    /* 占满整个视口高度 */
+    gap: 0;          /* 移除间距 */
+    align-items: stretch;  /* 子元素拉伸以填充容器高度 */
   }
 
   #map {
-    width: 800px;
-    height: 600px;
+    flex: 1;        /* 弹性布局占比为1 */
+    height: 100%;   /* 填满容器高度 */
     background-color: #f0f0f0;
   }
 
   #zone_joystick {
+    flex: 1;        /* 弹性布局占比为1 */
     position: relative;
     background: silver;
-    box-sizing: content-box;
-    height: 600px;
-    width: 600px;
+    height: 100%;   /* 填满容器高度 */
+  }
+
+  #joystick {
+    position: absolute;
+    width: 300px;   /* 摇杆容器宽度 */
+    height: 300px;  /* 摇杆容器高度 */
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);  /* 居中定位 */
   }
 </style>
 
@@ -57,14 +63,14 @@ var ros,
   function init() {
     // Connect to ROS.
     ros = new ROSLIB.Ros({
-      url : 'ws://192.168.50.130:9090'
+      url : 'ws://192.168.137.1:9090'
     });
 
     // Create the main viewer.
     viewer = new ROS3D.Viewer({
       divID : 'map',
-      width : 800,
-      height : 600,
+      width : document.documentElement.clientWidth / 2,
+      height : document.documentElement.clientHeight,
       antialias : false //禁用抗锯齿以提高性能
     });
 
@@ -111,15 +117,17 @@ var ros,
   function bottom3() {
     viewer.start();
   }
+
+  window.addEventListener('resize', function() {
+    viewer.resize(
+      document.documentElement.clientWidth / 2,
+      document.documentElement.clientHeight
+    );
+  });
 </script>
 </head>
 
 <body onload="init()">
-  <h1>Simple Map Example</h1>
-  <button type="button" onclick="bottom1()">button1</button>
-  <button type="button" onclick="bottom2()">button2</button>
-  <button type="button" onclick="bottom3()">button3</button>
-  <br><br>
   <div class="container">
     <div id="map"></div>
     <div id="zone_joystick">
