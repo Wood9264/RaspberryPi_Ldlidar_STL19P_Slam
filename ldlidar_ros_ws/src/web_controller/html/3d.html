@@ -27,30 +27,30 @@
     background-color: #f0f0f0;
   }
 
-  #zone_joystick {
+  #control-zone {
     flex: 1;        /* 弹性布局占比为1 */
     position: relative;
     background: silver;
     height: 100%;   /* 填满容器高度 */
+    display: flex;
+    flex-direction: column; /* 垂直方向排列 */
   }
 
   #joystick {
     position: absolute;
-    width: 300px;   /* 摇杆容器宽度 */
-    height: 300px;  /* 摇杆容器高度 */
+    width: 150px;   /* 摇杆容器宽度 */
+    height: 150px;  /* 摇杆容器高度 */
+    border-radius: 50%;  /* 圆形 */
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);  /* 居中定位 */
   }
 
-  /* 添加连接控件样式 */
   .connection-info {
-    position: absolute;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+    position: relative;
+    padding: 20px;
     text-align: center;
-    width: 80%;
+    flex-shrink: 0;       /* 防止内容压缩 */
   }
 
   .status {
@@ -91,6 +91,14 @@
     border: 1px solid #ccc;
     border-radius: 3px;
     width: 80px;
+  }
+
+  .joystick-container {
+    position: relative;
+    flex: 1;              /* 占用剩余空间 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
   }
 </style>
 
@@ -247,8 +255,7 @@ function cleanupViewer() {
 <body onload="init()">
   <div class="container">
     <div id="map"></div>
-    <div id="zone_joystick">
-        <!-- 添加连接控件 -->
+    <div id="control-zone">
         <div class="connection-info">
             <div id="status" class="status disconnected">未连接</div>
             <div>
@@ -257,7 +264,9 @@ function cleanupViewer() {
                 <button onclick="connect()">连接</button>
             </div>
         </div>
-        <div id="joystick"></div>
+        <div class="joystick-container">
+            <div id="joystick"></div>
+        </div>
     </div>
   </div>
 
@@ -267,7 +276,7 @@ function cleanupViewer() {
         mode: 'static',
         position: { left: '50%', top: '50%' },
         color: 'red',
-        size: 300,
+        size: 150,
     };
 
     var joystick = nipplejs.create(options);
