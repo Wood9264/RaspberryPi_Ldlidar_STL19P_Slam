@@ -42,6 +42,56 @@
     top: 50%;
     transform: translate(-50%, -50%);  /* 居中定位 */
   }
+
+  /* 添加连接控件样式 */
+  .connection-info {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    width: 80%;
+  }
+
+  .status {
+    margin: 10px;
+    padding: 10px;
+    border-radius: 5px;
+    font-weight: bold;
+  }
+
+  .status.connected {
+    background-color: #27ae60;
+    color: white;
+  }
+
+  .status.disconnected {
+    background-color: #e74c3c;
+    color: white;
+  }
+
+  button {
+    margin: 5px;
+    padding: 5px 15px;
+    font-size: 16px;
+    border: 2px solid #3498db;
+    border-radius: 5px;
+    background-color: #3498db;
+    color: #ffffff;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  button:hover {
+    background-color: #2980b9;
+  }
+
+  input[type="text"] {
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    width: 80px;
+  }
 </style>
 
 <script type="text/javascript" src="./jslib/three.js"></script>
@@ -57,21 +107,49 @@ var ros,
     gridClient,
     laserScan;
 
-  /**
-   * Setup all visualization elements when the page is loaded.
-   */
-  function init() {
-    // Connect to ROS.
+function init() {
+    // 获取当前页面的主机名/IP地址
+    const currentHost = window.location.hostname;
+    const port = document.getElementById('port').value;
+    const rosbridgeUrl = `ws://${currentHost}:${port}`;
+    
+    // Connect to ROS
     ros = new ROSLIB.Ros({
-      url : 'ws://192.168.137.1:9090'
+        url: rosbridgeUrl
     });
 
+    const statusElement = document.getElementById('status');
+
+    ros.on('connection', () => {
+        console.log('Connected to ROS Bridge');
+        statusElement.innerHTML = `已连接到 ${rosbridgeUrl}`;
+        statusElement.className = 'status connected';
+        
+        // 创建viewer等其他对象
+        initializeViewer();
+    });
+
+    ros.on('error', (error) => {
+        console.error('Error connecting to ROS: ', error);
+        statusElement.innerHTML = `连接失败: ${error}`;
+        statusElement.className = 'status disconnected';
+    });
+
+    ros.on('close', () => {
+        console.log('Disconnected from ROS');
+        statusElement.innerHTML = '已断开连接';
+        statusElement.className = 'status disconnected';
+    });
+}
+
+// 将原来init函数中的viewer初始化等代码移到这个新函数中
+function initializeViewer() {
     // Create the main viewer.
     viewer = new ROS3D.Viewer({
-      divID : 'map',
-      width : document.documentElement.clientWidth / 2,
-      height : document.documentElement.clientHeight,
-      antialias : false //禁用抗锯齿以提高性能
+        divID : 'map',
+        width : document.documentElement.clientWidth / 2,
+        height : document.documentElement.clientHeight,
+        antialias : false //禁用抗锯齿以提高性能
     });
 
     //初始化相机位置
@@ -100,7 +178,15 @@ var ros,
         color: 0xff00ff
       }
     });
-  }
+}
+
+// 添加连接函数
+function connect() {
+    if (ros) {
+        ros.close();
+    }
+    init();
+}
 
   function bottom1() {
     viewer.cameraControls.camera.position.x = -0.0000001;
@@ -131,7 +217,16 @@ var ros,
   <div class="container">
     <div id="map"></div>
     <div id="zone_joystick">
-      <div id="joystick"></div>
+        <!-- 添加连接控件 -->
+        <div class="connection-info">
+            <div id="status" class="status disconnected">未连接</div>
+            <div>
+                <label for="port">Rosbridge端口：</label>
+                <input type="text" id="port" value="9090" />
+                <button onclick="connect()">连接</button>
+            </div>
+        </div>
+        <div id="joystick"></div>
     </div>
   </div>
 
