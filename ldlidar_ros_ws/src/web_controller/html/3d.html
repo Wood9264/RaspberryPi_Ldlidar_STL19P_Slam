@@ -126,6 +126,46 @@
   .status-dot.active {
     background-color: #27ae60;  /* 运行时绿色 */
   }
+
+  .map-controls {
+    position: relative;
+    padding: 5px;
+    text-align: center;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+  }
+
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+  }
+
+  .modal-content {
+    background-color: #fefefe;
+    margin: 15% auto;
+    padding: 20px;
+    border-radius: 5px;
+    width: 300px;
+    text-align: center;
+  }
+
+  .modal-content input {
+    width: 200px;
+    margin: 10px 0;
+  }
+
+  .modal-buttons {
+    margin-top: 15px;
+  }
 </style>
 
 <script type="text/javascript" src="./jslib/three.js"></script>
@@ -142,7 +182,8 @@ var ros,
     laserScan;
 var startClient,
     stopClient,
-    statusClient;
+    statusClient,
+    mapOperationClient;  // 添加地图保存服务客户端
 
 function init() {
     // 获取当前页面的主机名/IP地址
@@ -181,9 +222,15 @@ function init() {
         console.log('Disconnected from ROS');
         statusElement.innerHTML = '已断开连接';
         statusElement.className = 'status disconnected';
-        cleanupViewer();  // 断开时清理实例
+        cleanupViewer();
         document.getElementById("mapping-status").classList.remove("active");
-    });
+        
+        // 清理服务客户端
+        startClient = null;
+        stopClient = null;
+        statusClient = null;
+        mapOperationClient = null;
+});
 }
 
 function initializeViewer() {
@@ -246,6 +293,12 @@ function initServiceClients() {
         ros: ros,
         name: "/mapping_status",
         serviceType: "std_srvs/Trigger"
+    });
+
+    mapOperationClient = new ROSLIB.Service({
+        ros: ros,
+        name: "/map_operation",
+        serviceType: "web_controller/MapOperation"
     });
 }
 
@@ -346,6 +399,82 @@ function stopMapping() {
         }
     });
 }
+
+// 预留加载地图函数
+function loadMap() {
+    if (!mapOperationClient) {
+        console.warn('地图操作服务未初始化');
+        return;
+    }
+
+    // 获取地图列表
+    const request = new ROSLIB.ServiceRequest({
+        operation: "list",
+        map_name: ""
+    });
+
+    mapOperationClient.callService(request, (result) => {
+        if (result.success) {
+            console.log('可用地图列表:', result.map_list);
+            // TODO: 显示地图选择界面
+        } else {
+            console.error('获取地图列表失败:', result.message);
+        }
+    });
+}
+
+// 显示保存地图弹窗
+function saveMap() {
+    document.getElementById('saveMapModal').style.display = 'block';
+    document.getElementById('mapName').value = 'map';  // 设置默认值
+}
+
+// 关闭弹窗
+function closeSaveMapModal() {
+    document.getElementById('saveMapModal').style.display = 'none';
+}
+
+// 确认保存地图
+function confirmSaveMap() {
+    if (!mapOperationClient) {
+        console.warn('地图保存服务未初始化');
+        return;
+    }
+    
+    const mapName = document.getElementById('mapName').value.trim();
+    if (!mapName) {
+        alert('请输入地图名称');
+        return;
+    }
+    
+    const request = new ROSLIB.ServiceRequest({
+        operation: "save",
+        map_name: mapName
+    });
+
+    mapOperationClient.callService(request, (result) => {
+        if (result.success) {
+            alert('地图保存成功');
+            closeSaveMapModal();
+        } else {
+            alert('地图保存失败: ' + result.message);
+        }
+    });
+}
+
+// 添加ESC键关闭弹窗
+window.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeSaveMapModal();
+    }
+});
+
+// 点击弹窗外部关闭弹窗
+window.addEventListener('click', function(event) {
+    if (event.target === document.getElementById('saveMapModal')) {
+        closeSaveMapModal();
+    }
+});
 </script>
 </head>
 
@@ -366,9 +495,28 @@ function stopMapping() {
           <button onclick="startMapping()">启动建图</button>
           <button onclick="stopMapping()">停止建图</button>
         </div>
+        <div class="map-controls">
+          <button onclick="loadMap()" disabled title="功能开发中">加载地图</button>
+          <button onclick="saveMap()">保存地图</button>
+        </div>
         <div class="joystick-container">
             <div id="joystick"></div>
         </div>
+    </div>
+  </div>
+
+  <!-- 添加保存地图弹窗 -->
+  <div id="saveMapModal" class="modal">
+    <div class="modal-content">
+      <h3>保存地图</h3>
+      <div>
+        <label for="mapName">地图名称：</label>
+        <input type="text" id="mapName" value="map" />
+      </div>
+      <div class="modal-buttons">
+        <button onclick="confirmSaveMap()">确认</button>
+        <button onclick="closeSaveMapModal()">取消</button>
+      </div>
     </div>
   </div>
 

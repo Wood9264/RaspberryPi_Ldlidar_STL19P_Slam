@@ -1,0 +1,6 @@
+string operation  # 操作类型: "save", "load", "list"
+string map_name   # 地图名称
+---
+bool success      # 操作是否成功
+string[] map_list # 地图列表(用于list操作)
+string message    # 返回消息

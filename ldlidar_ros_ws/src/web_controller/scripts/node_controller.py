@@ -5,6 +5,8 @@ import subprocess
 import signal
 import os
 from std_srvs.srv import Trigger, TriggerResponse
+from web_controller.srv import MapOperation, MapOperationResponse
+import glob
 
 class LaunchController:
     def __init__(self):
@@ -42,6 +44,29 @@ def handle_status(req):
     is_running = controller.is_running()
     return TriggerResponse(success=is_running, message=str(is_running))
 
+def handle_map_operation(req):
+    try:
+        if req.operation == "save":
+            save_path = os.path.expanduser(f"~/map/{req.map_name}")
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            cmd = ["rosrun", "map_server", "map_saver", "-f", save_path]
+            subprocess.run(cmd, check=True)
+            return MapOperationResponse(success=True, map_list=[], message=f"地图已保存为 {req.map_name}")
+            
+        elif req.operation == "list":
+            # 获取所有地图文件
+            map_path = os.path.expanduser("~/map")
+            maps = glob.glob(f"{map_path}/*.yaml")
+            map_names = [os.path.splitext(os.path.basename(m))[0] for m in maps]
+            return MapOperationResponse(success=True, map_list=map_names, message="获取地图列表成功")
+            
+        elif req.operation == "load":
+            # TODO: 实现地图加载功能
+            pass
+            
+    except Exception as e:
+        return MapOperationResponse(success=False, map_list=[], message=str(e))
+
 if __name__ == "__main__":
     rospy.init_node("control_node")
     controller = LaunchController()
@@ -50,6 +75,7 @@ if __name__ == "__main__":
     start_service = rospy.Service("/start_mapping", Trigger, handle_start)
     stop_service = rospy.Service("/stop_mapping", Trigger, handle_stop)
     status_service = rospy.Service("/mapping_status", Trigger, handle_status)
+    map_service = rospy.Service("/map_operation", MapOperation, handle_map_operation)
     
     rospy.loginfo("Node controller ready")
     rospy.spin()
