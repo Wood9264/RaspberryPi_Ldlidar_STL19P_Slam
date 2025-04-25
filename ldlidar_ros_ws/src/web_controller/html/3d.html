@@ -151,7 +151,10 @@
 
   .modal-content {
     background-color: #fefefe;
-    margin: 15% auto;
+    position: relative;
+    top: 50%;                     /* 从顶部偏移50% */
+    transform: translateY(-50%);   /* 向上偏移自身高度的50% */
+    margin: 0 auto;               /* 水平居中 */
     padding: 20px;
     border-radius: 5px;
     width: 300px;
