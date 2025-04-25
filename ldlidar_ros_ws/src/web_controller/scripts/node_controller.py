@@ -61,8 +61,40 @@ def handle_map_operation(req):
             return MapOperationResponse(success=True, map_list=map_names, message="获取地图列表成功")
             
         elif req.operation == "load":
-            # TODO: 实现地图加载功能
-            pass
+            # 检查地图文件是否存在
+            map_path = os.path.expanduser(f"~/map/{req.map_name}")
+            yaml_path = f"{map_path}.yaml"
+            if not os.path.exists(yaml_path):
+                return MapOperationResponse(
+                    success=False,
+                    map_list=[],
+                    message=f"地图文件 {yaml_path} 不存在"
+                )
+            
+            try:
+                # 如果已有地图服务在运行，先终止它
+                subprocess.run(["rosnode", "kill", "/map_server"], 
+                             check=False,  # 忽略错误，因为节点可能不存在
+                             stderr=subprocess.PIPE)
+                
+                # 启动新的地图服务
+                cmd = ["rosrun", "map_server", "map_server", yaml_path]
+                subprocess.Popen(cmd, 
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE)
+                
+                return MapOperationResponse(
+                    success=True,
+                    map_list=[],
+                    message=f"地图 {req.map_name} 加载成功"
+                )
+                
+            except subprocess.CalledProcessError as e:
+                return MapOperationResponse(
+                    success=False,
+                    map_list=[],
+                    message=f"加载地图失败: {str(e)}"
+                )
             
     except Exception as e:
         return MapOperationResponse(success=False, map_list=[], message=str(e))
