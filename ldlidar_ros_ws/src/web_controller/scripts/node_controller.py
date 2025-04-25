@@ -116,6 +116,13 @@ def handle_map_operation(req):
             return MapOperationResponse(success=True, map_list=map_names, message="获取地图列表成功")
             
         elif req.operation == "load":
+            # 先检查是否正在建图
+            if controller.is_running():
+                return MapOperationResponse(
+                    success=False,
+                    map_list=[],
+                    message="无法加载地图：建图功能正在运行"
+                )
             # 检查地图文件是否存在
             map_path = os.path.expanduser(f"~/map/{req.map_name}")
             yaml_path = f"{map_path}.yaml"
