@@ -75,7 +75,7 @@
 
   button {
     margin: 5px;
-    padding: 5px 15px;
+    padding: 5px 10px;
     font-size: 16px;
     border: 2px solid #3498db;
     border-radius: 5px;
@@ -112,7 +112,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 15px;
+    gap: 10px;
   }
 
   .status-dot {
@@ -125,17 +125,6 @@
 
   .status-dot.active {
     background-color: #27ae60;  /* 运行时绿色 */
-  }
-
-  .map-controls {
-    position: relative;
-    padding: 5px;
-    text-align: center;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 15px;
   }
 
   .modal {
@@ -591,8 +580,6 @@ window.addEventListener('click', function(event) {
           <div id="mapping-status" class="status-dot"></div>
           <button onclick="startMapping()">启动建图</button>
           <button onclick="stopMapping()">停止建图</button>
-        </div>
-        <div class="map-controls">
           <button onclick="loadMap()">加载地图</button>
           <button onclick="saveMap()">保存地图</button>
         </div>
