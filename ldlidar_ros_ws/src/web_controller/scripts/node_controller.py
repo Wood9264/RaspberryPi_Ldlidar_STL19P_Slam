@@ -158,7 +158,7 @@ def handle_map_operation(req):
         return MapOperationResponse(success=False, map_list=[], message=str(e))
 
 if __name__ == "__main__":
-    rospy.init_node("control_node")
+    rospy.init_node("node_controller")
     controller = LaunchController()
     
     # 创建服务
