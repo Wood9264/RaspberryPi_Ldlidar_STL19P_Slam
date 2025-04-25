@@ -3,4 +3,5 @@
     <node name="board" pkg="rosboard" type="rosboard_node" output="screen"></node>
     <node name="web_server" pkg="web_controller" type="start_http_server.py" output="screen"></node>
     <node name="tf2_web_republisher" pkg="tf2_web_republisher" type="tf2_web_republisher" output="screen"></node>
+    <node name="node_controller" pkg="web_controller" type="node_controller.py" output="screen"></node>
 </launch>
