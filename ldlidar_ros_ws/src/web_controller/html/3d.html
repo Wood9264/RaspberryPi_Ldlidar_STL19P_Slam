@@ -187,6 +187,51 @@
     color: #666;
     font-style: italic;
   }
+
+  .log-modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+  }
+  
+  .log-content {
+      background-color: #fefefe;
+      position: relative;
+      top: 50%;
+      transform: translateY(-50%);
+      margin: 0 auto;
+      padding: 20px;
+      border-radius: 5px;
+      width: 80%;
+      height: 70%;
+      display: flex;
+      flex-direction: column;
+  }
+  
+  .log-area {
+      flex: 1;
+      overflow-y: auto;
+      background-color: #2b2b2b;
+      color: #f0f0f0;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      border-radius: 3px;
+  }
+  
+  .log-controls {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+  }
 </style>
 
 <script type="text/javascript" src="./jslib/three.js"></script>
@@ -205,6 +250,12 @@ var startClient,
     stopClient,
     statusClient,
     mapOperationClient;  // 添加地图保存服务客户端
+
+// 日志相关变量
+var logSubscriber;
+var autoScroll = true;
+var logBuffer = [];
+const MAX_LOG_LINES = 1000;  // 最大日志行数
 
 function init() {
     // 获取当前页面的主机名/IP地址
@@ -231,6 +282,9 @@ function init() {
 
         // 查询建图状态
         updateMappingStatusDot();
+
+        // 初始化日志订阅
+        initLogSubscriber();
     });
 
     ros.on('error', (error) => {
@@ -321,6 +375,106 @@ function initServiceClients() {
         name: "/map_operation",
         serviceType: "web_controller/MapOperation"
     });
+}
+
+// 初始化日志订阅
+function initLogSubscriber() {
+    if (logSubscriber) {
+        logSubscriber.unsubscribe();
+    }
+
+    // 订阅rosout主题
+    logSubscriber = new ROSLIB.Topic({
+        ros: ros,
+        name: '/rosout',
+        messageType: 'rosgraph_msgs/Log'
+    });
+
+    logSubscriber.subscribe(function(message) {
+        addLogMessage(`[${message.name}] ${message.msg}`, message.level);
+    });
+}
+
+// 添加日志消息
+function addLogMessage(message, level) {
+    const timestamp = new Date().toLocaleTimeString();
+    let levelStr = '';
+    
+    // 从level获取日志级别
+    if (typeof level === 'number') {
+        switch(level) {
+            case 1: // Debug
+                levelStr = '[DEBUG]';
+                break;
+            case 2: // Info
+                levelStr = '[INFO]';
+                break;
+            case 4: // Warn
+                levelStr = '[WARN]';
+                break;
+            case 8: // Error
+                levelStr = '[ERROR]';
+                break;
+            case 16: // Fatal
+                levelStr = '[FATAL]';
+                break;
+            default:
+                levelStr = '[INFO]';
+        }
+    } else {
+        // 默认为INFO级别
+        levelStr = '[INFO]';
+    }
+    
+    logBuffer.push(`[${timestamp}]${levelStr} ${message}`);
+    
+    // 限制日志行数
+    if (logBuffer.length > MAX_LOG_LINES) {
+        logBuffer.shift();
+    }
+    
+    // 更新显示
+    updateLogDisplay();
+}
+
+// 更新日志显示
+function updateLogDisplay() {
+    const logArea = document.getElementById('logArea');
+    logArea.textContent = logBuffer.join('\n');
+    
+    // 如果开启了自动滚动，滚动到底部
+    if (autoScroll) {
+        logArea.scrollTop = logArea.scrollHeight;
+    }
+}
+
+// 切换日志窗口显示
+function toggleLogModal() {
+    const modal = document.getElementById('logModal');
+    if (modal.style.display === 'block') {
+        closeLogModal();
+    } else {
+        modal.style.display = 'block';
+        updateLogDisplay();
+    }
+}
+
+// 关闭日志窗口
+function closeLogModal() {
+    document.getElementById('logModal').style.display = 'none';
+}
+
+// 切换自动滚动
+function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    document.getElementById('autoScrollBtn').textContent = 
+        `自动滚动：${autoScroll ? '开' : '关'}`;
+}
+
+// 清除日志
+function clearLog() {
+    logBuffer = [];
+    updateLogDisplay();
 }
 
 function connect() {
@@ -549,6 +703,7 @@ window.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         closeSaveMapModal();
         closeLoadMapModal();
+        closeLogModal();
     }
 });
 
@@ -559,6 +714,9 @@ window.addEventListener('click', function(event) {
     }
     if (event.target === document.getElementById('loadMapModal')) {
         closeLoadMapModal();
+    }
+    if (event.target === document.getElementById('logModal')) {
+        closeLogModal();
     }
 });
 </script>
@@ -574,6 +732,7 @@ window.addEventListener('click', function(event) {
                 <label for="port">Rosbridge端口：</label>
                 <input type="text" id="port" value="9090" />
                 <button onclick="connect()">连接</button>
+                <button onclick="toggleLogModal()">日志</button>
             </div>
         </div>
         <div class="mapping-controls">
@@ -614,6 +773,17 @@ window.addEventListener('click', function(event) {
             <button onclick="closeLoadMapModal()">取消</button>
         </div>
     </div>
+  </div>
+
+  <div id="logModal" class="log-modal">
+      <div class="log-content">
+          <div id="logArea" class="log-area"></div>
+          <div class="log-controls">
+              <button onclick="toggleAutoScroll()" id="autoScrollBtn">自动滚动：开</button>
+              <button onclick="clearLog()">清除</button>
+              <button onclick="closeLogModal()">关闭</button>
+          </div>
+      </div>
   </div>
 
   <script>
