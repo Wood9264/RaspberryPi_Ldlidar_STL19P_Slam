@@ -225,6 +225,27 @@
       white-space: pre-wrap;
       border-radius: 3px;
   }
+
+  .log-debug {
+      color: #888888;  /* 灰色 */
+  }
+  
+  .log-info {
+      color: #f0f0f0;  /* 白色 */
+  }
+  
+  .log-warn {
+      color: #f1c40f;  /* 黄色 */
+  }
+  
+  .log-error {
+      color: #e74c3c;  /* 红色 */
+  }
+  
+  .log-fatal {
+      color: #c0392b;  /* 深红色 */
+      font-weight: bold;
+  }
   
   .log-controls {
       margin-top: 10px;
@@ -399,34 +420,42 @@ function initLogSubscriber() {
 function addLogMessage(message, level) {
     const timestamp = new Date().toLocaleTimeString();
     let levelStr = '';
+    let levelClass = '';
     
     // 从level获取日志级别
     if (typeof level === 'number') {
         switch(level) {
             case 1: // Debug
                 levelStr = '[DEBUG]';
+                levelClass = 'log-debug';
                 break;
             case 2: // Info
                 levelStr = '[INFO]';
+                levelClass = 'log-info';
                 break;
             case 4: // Warn
                 levelStr = '[WARN]';
+                levelClass = 'log-warn';
                 break;
             case 8: // Error
                 levelStr = '[ERROR]';
+                levelClass = 'log-error';
                 break;
             case 16: // Fatal
                 levelStr = '[FATAL]';
+                levelClass = 'log-fatal';
                 break;
             default:
                 levelStr = '[INFO]';
+                levelClass = 'log-info';
         }
     } else {
-        // 默认为INFO级别
         levelStr = '[INFO]';
+        levelClass = 'log-info';
     }
     
-    logBuffer.push(`[${timestamp}]${levelStr} ${message}`);
+    // 使用HTML格式存储日志
+    logBuffer.push(`<span class="${levelClass}">[${timestamp}]${levelStr} ${message}</span>`);
     
     // 限制日志行数
     if (logBuffer.length > MAX_LOG_LINES) {
@@ -440,7 +469,7 @@ function addLogMessage(message, level) {
 // 更新日志显示
 function updateLogDisplay() {
     const logArea = document.getElementById('logArea');
-    logArea.textContent = logBuffer.join('\n');
+    logArea.innerHTML = logBuffer.join('<br>');
     
     // 如果开启了自动滚动，滚动到底部
     if (autoScroll) {
