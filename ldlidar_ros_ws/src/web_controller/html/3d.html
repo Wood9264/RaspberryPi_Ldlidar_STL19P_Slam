@@ -734,6 +734,14 @@ window.addEventListener('keydown', function(event) {
         closeLoadMapModal();
         closeLogModal();
     }
+    if (event.key === 'Enter') {
+        if (document.getElementById('saveMapModal').style.display === 'block') {
+            confirmSaveMap();
+        }
+        if (document.getElementById('loadMapModal').style.display === 'block') {
+            confirmLoadMap();
+        }
+    }
 });
 
 // 点击弹窗外部关闭弹窗
