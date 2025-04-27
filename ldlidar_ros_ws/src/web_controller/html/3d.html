@@ -253,6 +253,79 @@
       gap: 10px;
       justify-content: flex-end;
   }
+
+  .toast-container {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+  }
+  
+  .toast {
+      padding: 12px 24px;
+      border-radius: 4px;
+      background-color: #333;
+      color: white;
+      min-width: 250px;
+      max-width: 500px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      animation: toast-in-out 0.3s ease-in-out;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.16);
+  }
+  
+  .toast.success {
+      background-color: #27ae60;
+  }
+  
+  .toast.error {
+      background-color: #e74c3c;
+  }
+  
+  .toast-close {
+      background: none;
+      border: none;
+      color: white;
+      padding: 0 0 0 12px;
+      cursor: pointer;
+      font-size: 18px;
+      margin: 0;
+  }
+  
+  .toast-close:hover {
+      background: none;
+  }
+  
+  @keyframes toast-in-out {
+      0% {
+          transform: translateY(100px);
+          opacity: 0;
+      }
+      100% {
+          transform: translateY(0);
+          opacity: 1;
+      }
+  }
+  
+  .toast.hiding {
+      animation: toast-out 0.3s ease-in-out forwards;
+  }
+  
+  @keyframes toast-out {
+      0% {
+          transform: translateY(0);
+          opacity: 1;
+      }
+      100% {
+          transform: translateY(100px);
+          opacity: 0;
+      }
+  }
 </style>
 
 <script type="text/javascript" src="./jslib/three.js"></script>
@@ -611,6 +684,7 @@ var selectedMapName = null;
 function loadMap() {
     if (!mapOperationClient) {
         console.warn('地图操作服务未初始化');
+        showToast('地图操作服务未初始化', 'error');
         return;
     }
 
@@ -673,10 +747,10 @@ function confirmLoadMap() {
 
     mapOperationClient.callService(request, (result) => {
         if (result.success) {
-            alert('地图加载成功');
+            showToast('地图加载成功', 'success');
             closeLoadMapModal();
         } else {
-            alert('地图加载失败: ' + result.message);
+            showToast('地图加载失败: ' + result.message, 'error');
         }
     });
 }
@@ -703,12 +777,13 @@ function closeSaveMapModal() {
 function confirmSaveMap() {
     if (!mapOperationClient) {
         console.warn('地图保存服务未初始化');
+        showToast('地图保存服务未初始化', 'error');
         return;
     }
     
     const mapName = document.getElementById('mapName').value.trim();
     if (!mapName) {
-        alert('请输入地图名称');
+        showToast('请输入地图名称', 'error');
         return;
     }
     
@@ -719,10 +794,10 @@ function confirmSaveMap() {
 
     mapOperationClient.callService(request, (result) => {
         if (result.success) {
-            alert('地图保存成功');
+            showToast('地图保存成功', 'success');
             closeSaveMapModal();
         } else {
-            alert('地图保存失败: ' + result.message);
+            showToast('地图保存失败: ' + result.message, 'error');
         }
     });
 }
@@ -756,6 +831,42 @@ window.addEventListener('click', function(event) {
         closeLogModal();
     }
 });
+
+// Toast 通知系统
+function showToast(message, type = 'info', duration = 1000) {
+    const container = document.getElementById('toastContainer');
+    
+    // 创建 toast 元素
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    // 创建消息文本
+    const messageText = document.createElement('span');
+    messageText.textContent = message;
+    
+    // 创建关闭按钮
+    const closeButton = document.createElement('button');
+    closeButton.className = 'toast-close';
+    closeButton.innerHTML = '×';
+    closeButton.onclick = () => removeToast(toast);
+    
+    // 组装 toast
+    toast.appendChild(messageText);
+    toast.appendChild(closeButton);
+    container.appendChild(toast);
+    
+    // 设置自动关闭
+    setTimeout(() => removeToast(toast), duration);
+}
+
+function removeToast(toast) {
+    if (!toast.classList.contains('hiding')) {
+        toast.classList.add('hiding');
+        toast.addEventListener('animationend', () => {
+            toast.remove();
+        });
+    }
+}
 </script>
 </head>
 
@@ -822,6 +933,8 @@ window.addEventListener('click', function(event) {
           </div>
       </div>
   </div>
+
+  <div class="toast-container" id="toastContainer"></div>
 
   <script>
     var options = {
